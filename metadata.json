@@ -1,0 +1,5 @@
+{
+  "name": "Health on Wheels",
+  "description": "Ugandan digital healthcare platform connecting patients to doctors and delivering genuine medicines.",
+  "requestFramePermissions": ["geolocation"]
+}
