@@ -14,6 +14,13 @@ export const PHARMACIES: Pharmacy[] = [
   { id: 'first-pharm', name: 'First Pharmacy', location: 'Wandegeya', rating: 4.5, deliveryTime: '30-45 mins' },
 ];
 
+export const MEDICAL_PROVIDERS = [
+  { id: 'mulago', name: 'Mulago National Referral Hospital', location: 'Mulago Hill, Kampala', distance: '1.2km' },
+  { id: 'case', name: 'Case Hospital', location: 'Buganda Road, Kampala', distance: '2.5km' },
+  { id: 'iueh', name: 'International University of East Africa Hospital', location: 'Kansanga, Kampala', distance: '4.8km' },
+  { id: 'nsambya', name: 'St. Francis Hospital Nsambya', location: 'Nsambya, Kampala', distance: '3.1km' },
+];
+
 export const AI_MODEL = "gemini-3-flash-preview";
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCCFxXUW1lduA2ieSvKbiL9hNETUg-303M';
 export const SYSTEM_INSTRUCTION = `You are the Health on Wheels Online Assistant, a medical and platform AI for "Health on Wheels" in Uganda. 

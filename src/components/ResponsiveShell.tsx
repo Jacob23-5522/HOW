@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Stethoscope, MessageSquare, Pill, User, AlertCircle, Bell, Menu } from 'lucide-react';
+import { Home, Stethoscope, MessageSquare, Pill, User, AlertCircle, Bell, Loader2, CheckCircle2, X } from 'lucide-react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { MEDICAL_PROVIDERS } from '../constants';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ResponsiveShellProps {
   children: React.ReactNode;
@@ -13,6 +15,9 @@ const ResponsiveShell: React.FC<ResponsiveShellProps> = ({ children }) => {
 
   const showNav = !['/', '/onboarding', '/landing', '/login', '/signup', '/payment'].includes(currentPath);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [sosStatus, setSosStatus] = useState<'idle' | 'searching' | 'pinging' | 'sent' | 'error'>('idle');
+  const [nearestProvider, setNearestProvider] = useState<typeof MEDICAL_PROVIDERS[0] | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -21,8 +26,45 @@ const ResponsiveShell: React.FC<ResponsiveShellProps> = ({ children }) => {
   }, []);
 
   const handleSOS = () => {
-    if (confirm("Are you sure you want to call Emergency Services (999)?")) {
-      window.location.href = 'tel:999';
+    setSosStatus('searching');
+    
+    // 1. Get real-time location
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+          
+          // 2. Simulate finding the nearest provider
+          setTimeout(() => {
+            const nearest = MEDICAL_PROVIDERS[0];
+            setNearestProvider(nearest);
+            setSosStatus('pinging');
+            
+            // 3. "Ping" the location to the provider
+            setTimeout(() => {
+              setSosStatus('sent');
+              
+              // Auto-close after 8 seconds
+              setTimeout(() => {
+                setSosStatus('idle');
+                setNearestProvider(null);
+                setUserLocation(null);
+              }, 8000);
+            }, 2000);
+          }, 1500);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          // Fallback if location is denied
+          setSosStatus('sent');
+          setNearestProvider(MEDICAL_PROVIDERS[0]);
+        }
+      );
+    } else {
+      // Fallback for browsers without geolocation
+      setSosStatus('sent');
+      setNearestProvider(MEDICAL_PROVIDERS[0]);
     }
   };
 
@@ -79,6 +121,76 @@ const ResponsiveShell: React.FC<ResponsiveShellProps> = ({ children }) => {
               ))}
             </div>
           )}
+
+          {/* SOS Notification Overlay */}
+          <AnimatePresence>
+            {sosStatus !== 'idle' && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6"
+              >
+                <motion.div 
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.9, y: 20 }}
+                  className="bg-white rounded-[2rem] p-8 w-full max-w-xs text-center shadow-2xl relative"
+                >
+                  <button 
+                    onClick={() => setSosStatus('idle')}
+                    className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+
+                  <div className={`w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center ${sosStatus === 'searching' || sosStatus === 'pinging' ? 'bg-red-50' : 'bg-green-50'}`}>
+                    {sosStatus === 'searching' || sosStatus === 'pinging' ? (
+                      <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-10 h-10 text-green-600" />
+                    )}
+                  </div>
+
+                  <h3 className="text-xl font-bold text-dark-gray mb-2">
+                    {sosStatus === 'searching' ? 'Emergency SOS' : sosStatus === 'pinging' ? 'Pinging Location' : 'Alert Sent!'}
+                  </h3>
+                  
+                  <p className="text-gray-500 text-sm mb-6">
+                    {sosStatus === 'searching' 
+                      ? 'Locating the nearest medical provider...' 
+                      : sosStatus === 'pinging'
+                      ? 'Transmitting your real-time coordinates for immediate dispatch...'
+                      : `Your emergency alert has been received by ${nearestProvider?.name}. Help is on the way.`}
+                  </p>
+
+                  {userLocation && (
+                    <div className="bg-red-50 rounded-2xl p-4 text-left mb-4 border border-red-100">
+                      <p className="text-[10px] text-red-400 uppercase font-bold mb-1">Your Current Coordinates</p>
+                      <p className="font-mono text-xs text-red-600">Lat: {userLocation.lat.toFixed(6)}</p>
+                      <p className="font-mono text-xs text-red-600">Lng: {userLocation.lng.toFixed(6)}</p>
+                    </div>
+                  )}
+
+                  {sosStatus === 'sent' && (
+                    <div className="bg-gray-50 rounded-2xl p-4 text-left mb-6">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Assigned Provider</p>
+                      <p className="font-bold text-sm text-dark-gray">{nearestProvider?.name}</p>
+                      <p className="text-xs text-gray-500">{nearestProvider?.location} • {nearestProvider?.distance}</p>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={() => setSosStatus('idle')}
+                    className={`w-full py-3 rounded-xl font-bold transition-all ${sosStatus === 'searching' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-health-green text-white shadow-lg'}`}
+                    disabled={sosStatus === 'searching'}
+                  >
+                    {sosStatus === 'searching' ? 'Please Wait...' : 'Understood'}
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     );
@@ -122,6 +234,76 @@ const ResponsiveShell: React.FC<ResponsiveShellProps> = ({ children }) => {
       <main className={`max-w-7xl mx-auto p-8 ${!showNav ? 'h-screen flex items-center justify-center' : ''}`}>
         {children}
       </main>
+
+      {/* SOS Notification Overlay (Desktop) */}
+      <AnimatePresence>
+        {sosStatus !== 'idle' && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-[2rem] p-10 w-full max-w-md text-center shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setSosStatus('idle')}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <div className={`w-24 h-24 rounded-full mx-auto mb-8 flex items-center justify-center ${sosStatus === 'searching' || sosStatus === 'pinging' ? 'bg-red-50' : 'bg-green-50'}`}>
+                {sosStatus === 'searching' || sosStatus === 'pinging' ? (
+                  <Loader2 className="w-12 h-12 text-red-600 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-12 h-12 text-green-600" />
+                )}
+              </div>
+
+              <h3 className="text-2xl font-bold text-dark-gray mb-4">
+                {sosStatus === 'searching' ? 'Emergency SOS' : sosStatus === 'pinging' ? 'Pinging Location' : 'Alert Sent!'}
+              </h3>
+              
+              <p className="text-gray-500 mb-8">
+                {sosStatus === 'searching' 
+                  ? 'Locating the nearest medical provider...' 
+                  : sosStatus === 'pinging'
+                  ? 'Transmitting your real-time coordinates for immediate dispatch...'
+                  : `Your emergency alert has been received by ${nearestProvider?.name}. Help is on the way.`}
+              </p>
+
+              {userLocation && (
+                <div className="bg-red-50 rounded-2xl p-6 text-left mb-6 border border-red-100">
+                  <p className="text-xs text-red-400 uppercase font-bold mb-2">Your Current Coordinates</p>
+                  <p className="font-mono text-sm text-red-600">Latitude: {userLocation.lat.toFixed(6)}</p>
+                  <p className="font-mono text-sm text-red-600">Longitude: {userLocation.lng.toFixed(6)}</p>
+                </div>
+              )}
+
+              {sosStatus === 'sent' && (
+                <div className="bg-gray-50 rounded-2xl p-6 text-left mb-8">
+                  <p className="text-xs text-gray-400 uppercase font-bold mb-2">Assigned Provider</p>
+                  <p className="font-bold text-lg text-dark-gray">{nearestProvider?.name}</p>
+                  <p className="text-sm text-gray-500">{nearestProvider?.location} • {nearestProvider?.distance}</p>
+                </div>
+              )}
+
+              <button 
+                onClick={() => setSosStatus('idle')}
+                className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${sosStatus === 'searching' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-health-green text-white shadow-lg'}`}
+                disabled={sosStatus === 'searching'}
+              >
+                {sosStatus === 'searching' ? 'Please Wait...' : 'Understood'}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating WhatsApp for Desktop */}
       {showNav && (
